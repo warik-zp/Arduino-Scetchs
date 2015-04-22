@@ -10,39 +10,38 @@ int relayPin = 7;
 
 void setup()
 {
-pinMode(relayPin, OUTPUT);
-digitalWrite(relayPin, HIGH);
+    pinMode(relayPin, OUTPUT);
+    digitalWrite(relayPin, HIGH);
 
-Serial.begin(9600);
-Serial.println("Device is ready");
-// Initialize the IO and ISR
-vw_setup(2000); // Bits per sec
-vw_rx_start(); // Start the receiver
+    Serial.begin(9600);
+    Serial.println("Device is ready");
+    // Initialize the IO and ISR
+    vw_setup(2000); // Bits per sec
+    vw_rx_start(); // Start the receiver
 }
 void loop()
 {
-if (vw_get_message(message, &messageLength)) // Non-blocking
+    if (vw_get_message(message, &messageLength)) // Non-blocking
+    {
+        Serial.print("Received: ");
+        for (int i = 0; i < messageLength; i++)
+        {
+            char c = message[i];
+            Serial.print(c);
 
-{
-Serial.print("Received: ");
-for (int i = 0; i < messageLength; i++)
-{
-char c = message[i];
-Serial.print(c);
+            char on = 'on';
+            if(c == on)
+            {
+                digitalWrite(relayPin, LOW);
+            }
+            char off = 'of';
 
-char on = 'on';
-if(c == on)
-{
-digitalWrite(relayPin, LOW);
-}
-char off = 'of';
+            if(c == off)
+            {
+                digitalWrite(relayPin, HIGH);
+            }
 
-if(c == off)
-{
-digitalWrite(relayPin, HIGH);
-}
-
-}
-Serial.println();
-}
+        }
+    Serial.println();
+    }
 }
