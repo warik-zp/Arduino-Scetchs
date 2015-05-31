@@ -112,14 +112,14 @@ void loop() { //Запускаем основной цикл
     if(pirVal == HIGH) //Если обнаружили движение
     {
       send_data = 1;
-      sprintf(buf, "GET /objects/?object=PIRSensor1&op=set&p=Value&v=%i HTTP/1.0", (int)send_data);
-      //sprintf(buf, "GET /objects/?script=easyRF&did=20501&dest=0&pid=0&c=0&d=%i HTTP/1.0", (int)send_data);
+      //sprintf(buf, "GET /objects/?object=PIRSensor1&op=set&p=Value&v=%i HTTP/1.0", (int)send_data);
+      sprintf(buf, "GET /objects/?script=easyRF&did=20501&dest=0&pid=0&c=0&d=%i HTTP/1.0", (int)send_data);
     }
     else //Если же движения нет
     {
       send_data = 0;
-      sprintf(buf, "GET /objects/?object=PIRSensor1&op=set&p=Value&v=%i HTTP/1.0", (int)send_data);
-      //sprintf(buf, "GET /objects/?script=easyRF&did=20501&dest=0&pid=0&c=0&d=%i HTTP/1.0", (int)send_data);
+      //sprintf(buf, "GET /objects/?object=PIRSensor1&op=set&p=Value&v=%i HTTP/1.0", (int)send_data);
+      sprintf(buf, "GET /objects/?script=easyRF&did=20501&dest=0&pid=0&c=0&d=%i HTTP/1.0", (int)send_data);
     }
     sendHTTPRequest();
   }
