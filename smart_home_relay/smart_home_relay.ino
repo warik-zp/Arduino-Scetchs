@@ -3,12 +3,12 @@
 #include <Arduino.h>
 #include "WebServer.h" // Webduino (https://github.com/sirleech/Webduino)
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xE4, 0xDE, 0x35 }; // MAC-адрес нашего устройства
-byte ip[] = { 192, 168, 0, 21 };
+byte ip[] = { 192, 168, 1, 21 };
 byte subnet[] = { 255, 255, 255, 0 };
-byte gateway[] = { 192, 168, 0, 1 };
-byte dns_server[] = { 192, 168, 0, 1 };
+byte gateway[] = { 192, 168, 1, 1 };
+byte dns_server[] = { 192, 168, 1, 1 };
 // ip-адрес удалённого сервера
-byte rserver[] = { 192, 168, 0, 3 };
+byte rserver[] = { 192, 168, 1, 3 };
 // Настройки выходов
 int startPin=3;
 int endPin=6;
