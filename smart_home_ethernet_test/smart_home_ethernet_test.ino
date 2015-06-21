@@ -8,9 +8,9 @@ OneWire ds(2);
 int send_data;
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; //MAC
-byte ip[] = { 192, 168, 0, 20 }; //IP
-byte server[] = { 192, 168, 0, 3 }; //Server MDM
-byte gateway[] = { 192, 168, 0, 1 }; //Gateway
+byte ip[] = { 192, 168, 1, 20 }; //IP
+byte server[] = { 192, 168, 1, 3 }; //Server MDM
+byte gateway[] = { 192, 168, 1, 1 }; //Gateway
 byte subnet[] = { 255, 255, 255, 0 }; //Mask
 char buf[80];
 
@@ -25,7 +25,7 @@ void sendHTTPRequest() {
   if (rclient.connect(server, 80)) { 
    Serial.println("OK"); 
    rclient.println(buf);
-   rclient.println("Host: 192.168.0.3");
+   rclient.println("Host: 192.168.1.3");
    rclient.println();   
    delay(100);
    rclient.stop();
