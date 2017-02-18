@@ -1,1 +1,257 @@
+#include <Wire.h> 
+#include <EEPROM.h>
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x3F, 20, 4); // Для экрана 20х4
+//LiquidCrystal_I2C lcd(0x27, 16, 2); // Для экрана 16х2
+uint8_t char_cel[8] = {B00111,B00101,B00111,B00000,B00000,B00000,B00000,B00000}; //°
 
+#include <PinChangeInt.h>
+
+#define encoder0PinA  5
+#define encoder0PinB  6
+#define encoder0PinC  7
+
+#define encoder1PinA  8
+#define encoder1PinB  9
+#define encoder1PinC  10
+
+#define encoder2PinA  11
+#define encoder2PinB  12
+#define encoder2PinC  13
+
+int setSolderTemp = EEPROM.read(1);
+int pinSolderOut = 4;  // Выход для паяльника
+int pinSolderTCouple = A6;  // Термопара паяльника
+int oldsetSolderTemp = 0;
+
+int pinHotAirOut = 2;  // Выход для фена
+int pinHotAirTCouple = A7;  // Термопара фена
+int pinHotAirCoolerOut = 3;  // Выход для вентилятора фена ( PWM )
+int pinHotAirButton = 7;
+int setHotAirTemp = EEPROM.read(0); //Считывание значения температуры фена из EEPROM памяти
+int oldsetHotAirTemp = 0;
+
+void setup() {
+  //TCCR0B = TCCR0B & 0b11111000 | 0x01; // Частота ШИМ 5 и 6
+  //TCCR1B = TCCR1B & 0b11111000 | 0x02; // Частота ШИМ 9 и 10
+  TCCR2B = TCCR2B & 0b11111000 | 0x01; // Частота ШИМ 11 и 3
+  Serial.begin(9600);
+  lcd.begin();
+  lcd.createChar(1, char_cel);
+  
+  pinMode(encoder0PinA, INPUT);
+  digitalWrite(encoder0PinA, HIGH);     // подключить подтягивающий резистор
+  pinMode(encoder0PinB, INPUT);
+  digitalWrite(encoder0PinB, HIGH);    // подключить подтягивающий резистор
+  pinMode(encoder0PinC, INPUT_PULLUP);
+  attachPinChangeInterrupt(encoder0PinA, doEncoder0A, FALLING);
+  attachPinChangeInterrupt(encoder0PinB, doEncoder0B, FALLING);
+  attachPinChangeInterrupt(encoder0PinC, doEncoder0C, FALLING);
+
+  pinMode(encoder1PinA, INPUT);
+  digitalWrite(encoder1PinA, HIGH);     // подключить подтягивающий резистор
+  pinMode(encoder1PinB, INPUT);
+  digitalWrite(encoder1PinB, HIGH);    // подключить подтягивающий резистор
+  pinMode(encoder1PinC, INPUT_PULLUP);
+  attachPinChangeInterrupt(encoder1PinA, doEncoder1A, FALLING);
+  attachPinChangeInterrupt(encoder1PinB, doEncoder1B, FALLING);
+  attachPinChangeInterrupt(encoder1PinB, doEncoder1C, FALLING);  
+
+  pinMode(encoder2PinA, INPUT);
+  digitalWrite(encoder2PinA, HIGH);     // подключить подтягивающий резистор
+  pinMode(encoder2PinB, INPUT);
+  digitalWrite(encoder2PinB, HIGH);    // подключить подтягивающий резистор
+  pinMode(encoder2PinC, INPUT_PULLUP);
+  attachPinChangeInterrupt(encoder2PinA, doEncoder2A, FALLING);
+  attachPinChangeInterrupt(encoder2PinB, doEncoder2B, FALLING);
+  attachPinChangeInterrupt(encoder2PinB, doEncoder2C, FALLING);  
+  
+  pinMode(pinSolderOut, OUTPUT);
+  pinMode(pinHotAirOut, OUTPUT);
+
+  digitalWrite(pinSolderOut, LOW);
+  digitalWrite(pinHotAirOut, LOW);
+  analogWrite(pinHotAirCoolerOut, 255);
+  Serial.println("Start done.");
+}
+
+void loop() {
+// Преобразовываем значения
+  int solderTCouple = map(analogRead(pinSolderTCouple), 0, 780, 0, 480);
+  int hotAirTCouple = map(analogRead(pinHotAirTCouple), 0, 780, 0, 480);
+  
+  refreshDisplay();
+  
+// Поддержка установленной температуры паяльника
+/*  if (setSolderTemp >= solderTCouple && digitalRead(pinSolderButton) == HIGH)
+  {
+    digitalWrite(pinSolderOut, HIGH);
+  }
+  else{
+    digitalWrite(pinSolderOut, LOW);
+  }*/
+  
+// Поддержка установленной температуры фена
+  if (setHotAirTemp >= hotAirTCouple) //&& pinHotAirButton == 1)
+  {
+    digitalWrite(pinHotAirOut, HIGH);
+  }
+  else{
+    digitalWrite(pinHotAirOut, LOW);
+  }
+/*
+// Установка оборотов вентилятора фена
+  if (hotAirTCouple < 85 && digitalRead(pinHotAirButton) == LOW){
+    analogWrite(pinHotAirCoolerOut, 0);
+  }
+  else{ 
+    analogWrite(pinHotAirCoolerOut, setHotAirCooler);
+  }
+*/
+
+// Данные паяльника на дисплей
+  lcd.setCursor(0, 0);
+  lcd.print("Solder:");
+  lcd.setCursor(8, 0);
+/*  if (digitalRead(pinSolderButton) == HIGH){
+    lcd.print(solderTCouple);
+    lcd.setCursor(11, 0);
+    lcd.print("\1");
+  }
+  else{
+    lcd.print(" Off");
+  }*/
+
+// Данные фена на дисплей
+  lcd.setCursor(0, 1);
+  lcd.print("Air: ");
+  lcd.setCursor(5, 1);
+  //if (digitalRead(pinHotAirButton) == HIGH){
+    lcd.print(setHotAirTemp);
+    lcd.print("\1");
+    lcd.setCursor(10, 1);
+    lcd.print(hotAirTCouple);
+    lcd.print("\1");
+    // Вентилятор фена на дисплей
+    /*lcd.setCursor(14, 1);
+    lcd.print(displayHotAirCooler);*/
+  /*else{
+    lcd.print(" Off");
+  }*/
+
+  
+  lcd.setCursor(0, 2);
+  lcd.print(analogRead(pinSolderTCouple));
+  lcd.setCursor(0, 3);
+  lcd.print(analogRead(pinHotAirTCouple));
+  delay(200);
+}
+
+void refreshDisplay()
+{
+  String stringVar0 =  String(oldsetHotAirTemp, DEC);
+  String stringVar1 =  String(setHotAirTemp, DEC);
+  if (stringVar0.length() != stringVar1.length())
+  {
+    oldsetHotAirTemp = setHotAirTemp;
+    lcd.clear();
+  }
+  
+  String stringVar2 =  String(oldsetSolderTemp, DEC);
+  String stringVar3 =  String(setSolderTemp, DEC);
+  if (stringVar0.length() != stringVar1.length())
+  {
+    oldsetSolderTemp = setSolderTemp;
+    lcd.clear();
+  }
+}
+
+void doEncoder0A()
+{
+  if(digitalRead(encoder0PinB)==HIGH)
+  {
+    if(setHotAirTemp <= 0)
+    {
+      setHotAirTemp = 0;
+      EEPROM.write(0,setHotAirTemp);
+    }
+    else{
+      setHotAirTemp--;
+      EEPROM.write(0,setHotAirTemp);
+    }
+  }
+}
+void doEncoder0B()
+{
+  if(digitalRead(encoder0PinA)==HIGH)
+  {
+    setHotAirTemp++;
+    EEPROM.write(0,setHotAirTemp);
+  }
+}
+
+void doEncoder0C()
+{
+   if(digitalRead(encoder0PinC)==LOW)
+   {
+      Serial.println("TestC");
+      while(digitalRead(encoder0PinC)==LOW){delay(50);}
+   }
+}
+
+
+
+void doEncoder1A()
+{
+  if(digitalRead(encoder1PinB)==HIGH)
+  {
+    setHotAirTemp--;
+    EEPROM.write(0,setHotAirTemp);
+  }
+}
+
+void doEncoder1B()
+{
+  if(digitalRead(encoder1PinA)==HIGH)
+  {
+    setHotAirTemp++;
+    EEPROM.write(0,setHotAirTemp);
+  }
+}
+
+void doEncoder1C()
+{
+   if(digitalRead(encoder1PinC)==LOW)
+   {
+      Serial.println("TestC");
+      while(digitalRead(encoder1PinC)==LOW){delay(50);}
+   }
+}
+
+
+void doEncoder2A()
+{
+  if(digitalRead(encoder2PinB)==HIGH)
+  {
+    setHotAirTemp--;
+    EEPROM.write(0,setHotAirTemp);
+  }
+}
+
+void doEncoder2B()
+{
+  if(digitalRead(encoder2PinA)==HIGH)
+  {
+    setHotAirTemp++;
+    EEPROM.write(0,setHotAirTemp);
+  }
+}
+
+void doEncoder2C()
+{
+   if(digitalRead(encoder2PinC)==LOW)
+   {
+      Serial.println("TestC");
+      while(digitalRead(encoder2PinC)==LOW){delay(50);}
+   }
+}
