@@ -1,35 +1,43 @@
 #include <Wire.h> 
+#include <PinChangeInt.h>
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x3F, 20, 4); // Для экрана 20х4
 //LiquidCrystal_I2C lcd(0x27, 16, 2); // Для экрана 16х2
 uint8_t char_cel[8] = {B00111,B00101,B00111,B00000,B00000,B00000,B00000,B00000}; //°
 
-#include <PinChangeInt.h>
+#define encoder0PinA  2
+#define encoder0PinB  3
+#define encoder0PinC  4
 
-#define encoder0PinA  5
-#define encoder0PinB  6
-#define encoder0PinC  7
+#define encoder1PinA  5
+#define encoder1PinB  6
+#define encoder1PinC  7
 
-#define encoder1PinA  8
-#define encoder1PinB  9
-#define encoder1PinC  10
+#define encoder2PinA  8
+#define encoder2PinB  9
+#define encoder2PinC  10
 
-#define encoder2PinA  11
-#define encoder2PinB  12
-#define encoder2PinC  13
-
-int setSolderTemp = EEPROM.read(1);
-int pinSolderOut = 4;  // Выход для паяльника
+int setSolderTemp = EEPROM.read(2);
+int pinSolderOut = 13;  // Выход для паяльника
 int pinSolderTCouple = A6;  // Термопара паяльника
 int oldsetSolderTemp = 0;
+int stateSolder = 0;
+int oldstateSolder = 0;
 
-int pinHotAirOut = 2;  // Выход для фена
+int pinHotAirOut = 12;  // Выход для фена
 int pinHotAirTCouple = A7;  // Термопара фена
-int pinHotAirCoolerOut = 3;  // Выход для вентилятора фена ( PWM )
+int pinHotAirCoolerOut = 11;  // Выход для вентилятора фена ( PWM )
 int pinHotAirButton = 7;
 int setHotAirTemp = EEPROM.read(0); //Считывание значения температуры фена из EEPROM памяти
 int oldsetHotAirTemp = 0;
+int setHotAirCooler = EEPROM.read(1);
+int stateHotAir = 0;
+int oldstateHotAir = 0;
+
+int range = EEPROM.read(3);
+//int range = 1;
+int oldrange = 0;
 
 void setup() {
   //TCCR0B = TCCR0B & 0b11111000 | 0x01; // Частота ШИМ 5 и 6
@@ -55,7 +63,7 @@ void setup() {
   pinMode(encoder1PinC, INPUT_PULLUP);
   attachPinChangeInterrupt(encoder1PinA, doEncoder1A, FALLING);
   attachPinChangeInterrupt(encoder1PinB, doEncoder1B, FALLING);
-  attachPinChangeInterrupt(encoder1PinB, doEncoder1C, FALLING);  
+  attachPinChangeInterrupt(encoder1PinC, doEncoder1C, FALLING);  
 
   pinMode(encoder2PinA, INPUT);
   digitalWrite(encoder2PinA, HIGH);     // подключить подтягивающий резистор
@@ -64,88 +72,103 @@ void setup() {
   pinMode(encoder2PinC, INPUT_PULLUP);
   attachPinChangeInterrupt(encoder2PinA, doEncoder2A, FALLING);
   attachPinChangeInterrupt(encoder2PinB, doEncoder2B, FALLING);
-  attachPinChangeInterrupt(encoder2PinB, doEncoder2C, FALLING);  
-  
+  attachPinChangeInterrupt(encoder2PinC, doEncoder2C, FALLING);
+
   pinMode(pinSolderOut, OUTPUT);
   pinMode(pinHotAirOut, OUTPUT);
-
   digitalWrite(pinSolderOut, LOW);
   digitalWrite(pinHotAirOut, LOW);
-  analogWrite(pinHotAirCoolerOut, 255);
+  
   Serial.println("Start done.");
 }
 
 void loop() {
 // Преобразовываем значения
-  int solderTCouple = map(analogRead(pinSolderTCouple), 0, 780, 0, 480);
+  int solderTCouple = map(analogRead(pinSolderTCouple), 0, 480, 0, 480);
   int hotAirTCouple = map(analogRead(pinHotAirTCouple), 0, 780, 0, 480);
+  int displayHotAirCooler = map(setHotAirCooler, 0, 255, 0, 99);
   
   refreshDisplay();
   
 // Поддержка установленной температуры паяльника
-/*  if (setSolderTemp >= solderTCouple && digitalRead(pinSolderButton) == HIGH)
+  if (setSolderTemp >= solderTCouple && stateSolder == 1)
   {
     digitalWrite(pinSolderOut, HIGH);
   }
   else{
     digitalWrite(pinSolderOut, LOW);
-  }*/
+  }
   
 // Поддержка установленной температуры фена
-  if (setHotAirTemp >= hotAirTCouple) //&& pinHotAirButton == 1)
+  if (setHotAirTemp >= hotAirTCouple && stateHotAir == 1)
   {
     digitalWrite(pinHotAirOut, HIGH);
   }
   else{
     digitalWrite(pinHotAirOut, LOW);
   }
-/*
+
 // Установка оборотов вентилятора фена
-  if (hotAirTCouple < 85 && digitalRead(pinHotAirButton) == LOW){
+  if (hotAirTCouple < 85 && stateHotAir == 0){
     analogWrite(pinHotAirCoolerOut, 0);
   }
-  else{ 
+  else{
     analogWrite(pinHotAirCoolerOut, setHotAirCooler);
   }
-*/
+
 
 // Данные паяльника на дисплей
   lcd.setCursor(0, 0);
   lcd.print("Solder:");
   lcd.setCursor(8, 0);
-/*  if (digitalRead(pinSolderButton) == HIGH){
+  if (stateSolder == 1){
+    lcd.print(setSolderTemp);
+    lcd.print("\1");
+    lcd.setCursor(13, 0);
     lcd.print(solderTCouple);
-    lcd.setCursor(11, 0);
     lcd.print("\1");
   }
   else{
     lcd.print(" Off");
-  }*/
+  }
 
 // Данные фена на дисплей
   lcd.setCursor(0, 1);
   lcd.print("Air: ");
   lcd.setCursor(5, 1);
-  //if (digitalRead(pinHotAirButton) == HIGH){
+  if (stateHotAir == 1){
     lcd.print(setHotAirTemp);
     lcd.print("\1");
     lcd.setCursor(10, 1);
     lcd.print(hotAirTCouple);
     lcd.print("\1");
     // Вентилятор фена на дисплей
-    /*lcd.setCursor(14, 1);
-    lcd.print(displayHotAirCooler);*/
-  /*else{
+    lcd.setCursor(15, 1);
+    lcd.print(displayHotAirCooler);
+    lcd.print("%");
+  } else{
     lcd.print(" Off");
-  }*/
+  }
 
   
   lcd.setCursor(0, 2);
-  lcd.print(analogRead(pinSolderTCouple));
+  lcd.print("Range: X");
+  lcd.print(range);
   lcd.setCursor(0, 3);
   lcd.print(analogRead(pinHotAirTCouple));
-  delay(200);
+  lcd.print("     ");
+  lcd.print(analogRead(pinSolderTCouple));
+  delay(100);
 }
+
+//-----------------------------------------------------------
+
+void checkValue()
+{
+  //Добавить проверку значений для того чтобы избежать проблемы с отрицательным значением.
+}
+
+//-----------------------------------------------------------
 
 void refreshDisplay()
 {
@@ -159,34 +182,60 @@ void refreshDisplay()
   
   String stringVar2 =  String(oldsetSolderTemp, DEC);
   String stringVar3 =  String(setSolderTemp, DEC);
-  if (stringVar0.length() != stringVar1.length())
+  if (stringVar2.length() != stringVar3.length())
   {
     oldsetSolderTemp = setSolderTemp;
     lcd.clear();
   }
+  
+  if (oldstateSolder != stateSolder)
+  {
+    oldstateSolder = stateSolder;
+    lcd.clear();
+  }
+
+  if (oldstateHotAir != stateHotAir)
+  {
+    oldstateHotAir = stateHotAir;
+    lcd.clear();
+  }
+  if (oldrange != range)
+  {
+    oldrange = range;
+    lcd.clear();
+  }
 }
+
+//-----------------------------------------------------------
 
 void doEncoder0A()
 {
   if(digitalRead(encoder0PinB)==HIGH)
   {
-    if(setHotAirTemp <= 0)
+    if(stateSolder != 0)
     {
-      setHotAirTemp = 0;
-      EEPROM.write(0,setHotAirTemp);
-    }
-    else{
-      setHotAirTemp--;
-      EEPROM.write(0,setHotAirTemp);
+      if(setSolderTemp <= 0)
+      {
+        setSolderTemp = 0;
+        EEPROM.write(2,setSolderTemp);
+      }
+      else{
+        setSolderTemp = setSolderTemp - (1 * range);
+        EEPROM.write(2,setSolderTemp);
+      }
     }
   }
 }
+
 void doEncoder0B()
 {
   if(digitalRead(encoder0PinA)==HIGH)
   {
-    setHotAirTemp++;
-    EEPROM.write(0,setHotAirTemp);
+    if(stateSolder != 0)
+    {
+      setSolderTemp = setSolderTemp + (1 * range);
+      EEPROM.write(2,setSolderTemp);
+    }
   }
 }
 
@@ -194,19 +243,35 @@ void doEncoder0C()
 {
    if(digitalRead(encoder0PinC)==LOW)
    {
-      Serial.println("TestC");
+      if(stateSolder == 1)
+      {
+        stateSolder = 0;
+        Serial.println("Solder: Off");
+      } else{
+        stateSolder = 1;
+        Serial.println("Solder: On");
+      }
       while(digitalRead(encoder0PinC)==LOW){delay(50);}
    }
 }
 
-
+//-----------------------------------------------------------
 
 void doEncoder1A()
 {
   if(digitalRead(encoder1PinB)==HIGH)
   {
-    setHotAirTemp--;
-    EEPROM.write(0,setHotAirTemp);
+    if(stateHotAir != 0)
+    {
+      if(setHotAirCooler <= 0)
+      {
+        setHotAirCooler = 0;
+        EEPROM.write(1,setHotAirCooler);
+      } else{
+        setHotAirCooler--;
+        EEPROM.write(1,setHotAirCooler);
+      }
+    }
   }
 }
 
@@ -214,8 +279,17 @@ void doEncoder1B()
 {
   if(digitalRead(encoder1PinA)==HIGH)
   {
-    setHotAirTemp++;
-    EEPROM.write(0,setHotAirTemp);
+    if(stateHotAir != 0)
+    {
+      if(setHotAirCooler >= 255)
+      {
+        setHotAirCooler = 255;
+        EEPROM.write(1,setHotAirCooler);
+      } else{
+        setHotAirCooler++;
+        EEPROM.write(1,setHotAirCooler);
+      }
+    }
   }
 }
 
@@ -223,18 +297,52 @@ void doEncoder1C()
 {
    if(digitalRead(encoder1PinC)==LOW)
    {
-      Serial.println("TestC");
+      if(range == 1)
+      {
+        range = 5;
+        EEPROM.write(3,range);
+      } else if(range == 5)
+      {
+        range = 10;
+        EEPROM.write(3,range);
+      } else if(range == 10)
+      {
+        range = 20;
+        EEPROM.write(3,range);
+      } else if(range == 20)
+      {
+        range = 50;
+        EEPROM.write(3,range);
+      } else if(range == 50)
+      {
+        range = 1;
+        EEPROM.write(3,range);
+      }
+      Serial.print("Range: ");
+      Serial.println(range);
       while(digitalRead(encoder1PinC)==LOW){delay(50);}
    }
 }
 
+//-----------------------------------------------------------
 
 void doEncoder2A()
 {
   if(digitalRead(encoder2PinB)==HIGH)
   {
-    setHotAirTemp--;
-    EEPROM.write(0,setHotAirTemp);
+    if(stateHotAir != 0)
+    {
+      if(setHotAirTemp <= 0)
+      {
+        setHotAirTemp = 0;
+        EEPROM.write(0,setHotAirTemp);
+      }
+      else{
+        //setHotAirTemp--;
+        setHotAirTemp = setHotAirTemp - (1 * range);
+        EEPROM.write(0,setHotAirTemp);
+      }
+    }
   }
 }
 
@@ -242,8 +350,12 @@ void doEncoder2B()
 {
   if(digitalRead(encoder2PinA)==HIGH)
   {
-    setHotAirTemp++;
-    EEPROM.write(0,setHotAirTemp);
+    if(stateHotAir != 0)
+    {
+      //setHotAirTemp++;
+      setHotAirTemp = setHotAirTemp + (1 * range);
+      EEPROM.write(0,setHotAirTemp);
+    }
   }
 }
 
@@ -251,7 +363,14 @@ void doEncoder2C()
 {
    if(digitalRead(encoder2PinC)==LOW)
    {
-      Serial.println("TestC");
+      if(stateHotAir == 1)
+      {
+        stateHotAir = 0;
+        Serial.println("Air: Off");
+      } else{
+        stateHotAir = 1;
+        Serial.println("Air: On");
+      }
       while(digitalRead(encoder2PinC)==LOW){delay(50);}
    }
 }
