@@ -1,3 +1,5 @@
+//Soldering station with three encoders.
+
 #include <Wire.h> 
 #include <PinChangeInt.h>
 #include <EEPROM.h>
